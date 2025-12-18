@@ -1,0 +1,37 @@
+name: Sync New Features
+
+on:
+  schedule:
+    - cron: '0 8 * * 0'  # Weekly on Sundays
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Sync from upstream
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git remote add upstream https://github.com/jacobjameson/birdhub-profile.git || true
+          git fetch upstream main
+          
+          # Only sync app files, never touch data.json or user's profile settings
+          git checkout upstream/main -- index.html 2>/dev/null || true
+          git checkout upstream/main -- embed.html 2>/dev/null || true
+          git checkout upstream/main -- fetch-ebird.js 2>/dev/null || true
+          git checkout upstream/main -- .github/workflows/sync-ebird.yml 2>/dev/null || true
+          git checkout upstream/main -- .github/workflows/sync-upstream.yml 2>/dev/null || true
+          
+          git add -A
+          if ! git diff --staged --quiet; then
+            git commit -m "✨ Sync new features"
+            git push
+          fi
