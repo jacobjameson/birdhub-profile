@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BirdHub Profile</title>
+  <meta name="description" content="My birding journey on BirdHub">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --sky-50: #f0f9ff;
+      --sky-100: #e0f2fe;
+      --sky-500: #0ea5e9;
+      --sky-600: #0284c7;
+      --forest-50: #f0fdf4;
+      --forest-100: #dcfce7;
+      --forest-400: #4ade80;
+      --forest-500: #22c55e;
+      --forest-600: #16a34a;
+      --forest-700: #15803d;
+      --sunset-400: #fb923c;
+      --sunset-500: #f97316;
+      --sand-50: #fafaf9;
+      --sand-100: #f5f5f4;
+      --sand-200: #e7e5e4;
+      --sand-300: #d6d3d1;
+      --sand-500: #78716c;
+      --sand-600: #57534e;
+      --sand-700: #44403c;
+      --sand-800: #292524;
+      --graph-0: #eee;
+      --graph-1: #c6e48b;
+      --graph-2: #7bc96f;
+      --graph-3: #239a3b;
+      --graph-4: #196127;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Nunito', sans-serif; background: linear-gradient(135deg, var(--sky-50) 0%, var(--forest-50) 100%); color: var(--sand-800); line-height: 1.6; min-height: 100vh; }
+    
+    .nav { background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 20px; color: var(--forest-600); text-decoration: none; }
+    .nav-brand:hover { color: var(--forest-500); }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-link { padding: 8px 14px; font-size: 14px; font-weight: 600; color: var(--sand-600); text-decoration: none; border-radius: 20px; transition: all 0.2s; }
+    .nav-link:hover { background: var(--forest-50); color: var(--forest-600); }
+
+    .profile-container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+    .profile-card { background: white; border-radius: 20px; padding: 28px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06); }
+    .profile-header { display: flex; gap: 24px; }
+    .avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--forest-400), var(--sky-500)); display: flex; align-items: center; justify-content: center; font-size: 48px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3); }
+    .profile-info { flex: 1; }
+    .profile-name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+    .profile-name { font-size: 26px; font-weight: 700; color: var(--sand-800); }
+    .profile-badge { padding: 4px 12px; font-size: 12px; font-weight: 700; border-radius: 20px; background: linear-gradient(135deg, var(--forest-400), var(--forest-500)); color: white; }
+    .profile-bio { font-size: 15px; color: var(--sand-600); margin-bottom: 12px; }
+    .profile-links { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .profile-link { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--sand-600); text-decoration: none; }
+    .profile-link:hover { color: var(--forest-600); }
+    .profile-link svg { width: 16px; height: 16px; }
+    .stats-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+    .stat { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--sand-100); border-radius: 12px; font-size: 14px; }
+    .stat-icon { font-size: 16px; }
+    .stat-value { font-weight: 700; color: var(--forest-600); }
+    .stat-label { color: var(--sand-600); }
+    .profile-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn { padding: 10px 18px; font-size: 14px; font-weight: 600; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; text-decoration: none; border: none; font-family: inherit; }
+    .btn-primary { background: linear-gradient(135deg, var(--forest-500), var(--forest-600)); color: white; box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4); }
+    .btn-secondary { background: var(--sand-100); color: var(--sand-700); }
+    .btn-secondary:hover { background: var(--sand-200); }
+
+    .graph-card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.04); }
+    .graph-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+    .graph-title { font-size: 15px; font-weight: 600; color: var(--sand-700); }
+    .graph-title strong { color: var(--forest-600); }
+    .year-selector { display: flex; gap: 6px; }
+    .year-btn { padding: 6px 14px; font-size: 13px; font-weight: 600; border: 2px solid var(--sand-200); border-radius: 20px; background: white; color: var(--sand-600); cursor: pointer; transition: all 0.2s; }
+    .year-btn:hover { border-color: var(--forest-400); color: var(--forest-600); }
+    .year-btn.active { background: var(--forest-500); border-color: var(--forest-500); color: white; }
+    .graph-wrapper { overflow-x: auto; padding: 10px 0; }
+    .contribution-graph { display: block; }
+    .month-label { fill: var(--sand-600); font-size: 11px; font-weight: 600; }
+    .day-label { fill: var(--sand-500); font-size: 10px; }
+    .contribution-cell { rx: 3; ry: 3; }
+    .contribution-cell.past { cursor: pointer; }
+    .contribution-cell.past:hover { stroke: var(--sand-800); stroke-width: 1.5; }
+    .contribution-cell.future { opacity: 0.3; cursor: default; }
+    .legend { display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: 10px; font-size: 12px; color: var(--sand-600); }
+    .legend-cell { width: 12px; height: 12px; border-radius: 3px; }
+
+    .activity-card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.04); }
+    .activity-header { font-size: 15px; font-weight: 700; color: var(--sand-700); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .activity-month { font-size: 14px; font-weight: 700; color: var(--forest-600); margin: 20px 0 10px; padding-bottom: 8px; border-bottom: 2px solid var(--sand-100); }
+    .activity-month:first-of-type { margin-top: 0; }
+    .activity-item { display: flex; gap: 14px; padding: 12px 0; }
+    .activity-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--forest-100), var(--sky-100)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .activity-content { flex: 1; }
+    .activity-title { font-weight: 600; font-size: 14px; color: var(--sand-700); margin-bottom: 2px; }
+    .activity-details { color: var(--sand-600); font-size: 13px; }
+
+    .tooltip { position: fixed; background: var(--sand-800); color: white; border-radius: 12px; padding: 12px 16px; font-size: 13px; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 1000; max-width: 280px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .tooltip.visible { opacity: 1; }
+    .tooltip-count { font-weight: 700; margin-bottom: 4px; color: var(--forest-400); }
+    .tooltip-date { opacity: 0.8; font-size: 12px; }
+    .tooltip-birds { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2); }
+    .tooltip-bird { margin-bottom: 6px; }
+    .bird-common { color: var(--forest-400); font-weight: 600; }
+    .bird-sci { font-style: italic; opacity: 0.7; font-size: 12px; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.visible { display: flex; }
+    .modal { background: white; border-radius: 20px; padding: 28px; max-width: 400px; width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+    .modal-header { margin-bottom: 20px; text-align: center; }
+    .modal-icon { font-size: 48px; margin-bottom: 12px; }
+    .modal-title { font-size: 22px; font-weight: 700; color: var(--sand-800); margin-bottom: 6px; }
+    .share-actions { display: flex; flex-direction: column; gap: 10px; }
+    .share-btn { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 2px solid var(--sand-200); border-radius: 12px; background: white; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s; text-decoration: none; color: var(--sand-700); font-family: inherit; width: 100%; }
+    .share-btn:hover { border-color: var(--forest-400); background: var(--forest-50); }
+    .share-btn-icon { font-size: 22px; }
+
+    .footer { text-align: center; padding: 30px 20px; font-size: 13px; color: var(--sand-500); }
+    .footer a { color: var(--forest-600); text-decoration: none; font-weight: 600; }
+    .footer a:hover { text-decoration: underline; }
+
+    .loading { text-align: center; padding: 100px 20px; }
+    .loading-icon { font-size: 60px; margin-bottom: 20px; animation: bounce 1s infinite; }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .loading-text { font-size: 18px; color: var(--sand-600); }
+
+    .error { text-align: center; padding: 100px 20px; }
+    .error-icon { font-size: 60px; margin-bottom: 20px; }
+    .error-text { font-size: 18px; color: var(--sand-600); margin-bottom: 20px; }
+
+    @media (max-width: 640px) {
+      .profile-header { flex-direction: column; align-items: center; text-align: center; }
+      .profile-links, .stats-row, .profile-actions { justify-content: center; }
+      .nav { padding: 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="https://jacobjameson.github.io/birdhub" class="nav-brand" target="_blank">🐦 BirdHub</a>
+    <div class="nav-links">
+      <a href="https://jacobjameson.github.io/birdhub" class="nav-link" target="_blank">🌍 Explore Flock</a>
+      <a href="https://github.com/jacobjameson/birdhub-profile" class="nav-link" target="_blank">Create Yours</a>
+    </div>
+  </nav>
+
+  <div id="loading" class="loading">
+    <div class="loading-icon">🐦</div>
+    <div class="loading-text">Loading profile...</div>
+  </div>
+
+  <div id="error" class="error" style="display: none;">
+    <div class="error-icon">🥚</div>
+    <div class="error-text">No bird data found yet!</div>
+    <p style="color: var(--sand-500); margin-bottom: 20px;">Run the "Sync eBird" workflow to fetch your birds.</p>
+    <a href="https://github.com/jacobjameson/birdhub-profile#setup-5-minutes" class="btn btn-primary" target="_blank">📖 Setup Guide</a>
+  </div>
+
+  <div class="profile-container" id="profileContainer" style="display: none;">
+    <div class="profile-card" id="profileCard">
+      <div class="profile-header">
+        <div class="avatar">🐦</div>
+        <div class="profile-info">
+          <div class="profile-name-row">
+            <h1 class="profile-name" id="profileName">Birder</h1>
+            <span class="profile-badge" id="profileBadge">2025</span>
+          </div>
+          <p class="profile-bio" id="profileBio">Tracking my birding adventures</p>
+          <div class="profile-links" id="profileLinks"></div>
+          <div class="stats-row">
+            <div class="stat"><span class="stat-icon">🪶</span><span class="stat-value" id="totalSpecies">0</span><span class="stat-label">species</span></div>
+            <div class="stat"><span class="stat-icon">📅</span><span class="stat-value" id="totalDays">0</span><span class="stat-label">birding days</span></div>
+            <div class="stat"><span class="stat-icon">📍</span><span class="stat-value" id="dateRange">-</span></div>
+          </div>
+          <div class="profile-actions">
+            <button class="btn btn-primary" onclick="exportPNG()">📸 Export</button>
+            <button class="btn btn-secondary" onclick="openShareModal()">↗️ Share</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="graph-card" id="graphCard">
+      <div class="graph-header">
+        <div class="graph-title"><strong id="yearSpeciesCount">0</strong> species in <span id="selectedYearText">2025</span></div>
+        <div class="year-selector" id="yearSelector"></div>
+      </div>
+      <div class="graph-wrapper"><svg class="contribution-graph" id="graph"></svg></div>
+      <div class="legend">
+        <span>Less</span>
+        <div class="legend-cell" style="background:var(--graph-0)"></div>
+        <div class="legend-cell" style="background:var(--graph-1)"></div>
+        <div class="legend-cell" style="background:var(--graph-2)"></div>
+        <div class="legend-cell" style="background:var(--graph-3)"></div>
+        <div class="legend-cell" style="background:var(--graph-4)"></div>
+        <span>More</span>
+      </div>
+    </div>
+
+    <div class="activity-card">
+      <div class="activity-header">🗓️ Recent Activity</div>
+      <div id="activityList"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Powered by <a href="https://jacobjameson.github.io/birdhub" target="_blank">BirdHub</a> · 
+    <a href="https://github.com/jacobjameson/birdhub-profile" target="_blank">Create your own profile</a>
+  </div>
+
+  <div class="modal-overlay" id="shareModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-icon">🎉</div>
+        <div class="modal-title">Share your profile</div>
+      </div>
+      <div class="share-actions">
+        <a href="#" class="share-btn" id="shareTwitter" target="_blank"><span class="share-btn-icon">𝕏</span> Share on X</a>
+        <button class="share-btn" onclick="exportPNG(); closeModal();"><span class="share-btn-icon">📸</span> Download Image</button>
+        <button class="share-btn" onclick="copyLink()"><span class="share-btn-icon">🔗</span> <span id="copyLinkText">Copy Profile Link</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    let observations = [], observationsByDate = new Map(), selectedYear = new Date().getFullYear(), availableYears = [], profileConfig = {};
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    async function loadProfile() {
+      try {
+        const r = await fetch('data.json');
+        if (!r.ok) throw new Error('No data.json');
+        const data = await r.json();
+        if (!data.observations || !data.observations.length) throw new Error('No observations');
+        
+        profileConfig = data.profile || {};
+        observations = data.observations;
+        observationsByDate = new Map();
+        observations.forEach(o => { if (!observationsByDate.has(o.date)) observationsByDate.set(o.date, []); observationsByDate.get(o.date).push(o); });
+        const years = new Set(observations.map(o => new Date(o.date).getFullYear()));
+        availableYears = Array.from(years).sort((a,b) => b - a);
+        selectedYear = availableYears[0] || new Date().getFullYear();
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('profileContainer').style.display = 'block';
+        updateProfile(); renderYearSelector(); drawGraph(); renderActivity();
+      } catch(e) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+
+    function updateProfile() {
+      const name = profileConfig.name || 'Birder';
+      document.getElementById('profileName').textContent = name;
+      document.getElementById('profileBadge').textContent = new Date().getFullYear();
+      document.title = `${name} | BirdHub`;
+      
+      const species = new Set(observations.map(o => o.sciName)).size;
+      document.getElementById('totalSpecies').textContent = species;
+      document.getElementById('totalDays').textContent = observationsByDate.size;
+      document.getElementById('profileBio').textContent = `${species} species and counting!`;
+      
+      const links = document.getElementById('profileLinks'); links.innerHTML = '';
+      if (profileConfig.github) links.innerHTML += `<a href="https://github.com/${profileConfig.github}" target="_blank" class="profile-link"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>${profileConfig.github}</a>`;
+      if (profileConfig.location) links.innerHTML += `<span class="profile-link">📍 ${profileConfig.location}</span>`;
+      
+      if (observations.length) {
+        const dates = observations.map(o => new Date(o.date)), fmt = d => d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
+        document.getElementById('dateRange').textContent = `${fmt(new Date(Math.min(...dates)))} – ${fmt(new Date(Math.max(...dates)))}`;
+      }
+    }
+
+    function renderYearSelector() {
+      const c = document.getElementById('yearSelector'); c.innerHTML = '';
+      availableYears.forEach(y => {
+        const b = document.createElement('button'); b.className = `year-btn ${y===selectedYear?'active':''}`;
+        b.textContent = y; b.onclick = () => { selectedYear = y; document.querySelectorAll('.year-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); drawGraph(); updateYearStats(); };
+        c.appendChild(b);
+      });
+      updateYearStats();
+    }
+
+    function updateYearStats() {
+      const yearObs = observations.filter(o => new Date(o.date).getFullYear() === selectedYear);
+      document.getElementById('yearSpeciesCount').textContent = new Set(yearObs.map(o => o.sciName)).size;
+      document.getElementById('selectedYearText').textContent = selectedYear;
+    }
+
+    function drawGraph() {
+      const svg = d3.select('#graph'); svg.selectAll('*').remove();
+      const cellSize = 12, cellGap = 3, marginLeft = 30, marginTop = 20;
+      const startDate = new Date(selectedYear, 0, 1), endDate = new Date(selectedYear, 11, 31);
+      const weeks = d3.timeWeeks(d3.timeWeek.floor(startDate), d3.timeDay.offset(endDate, 1));
+      svg.attr('width', weeks.length * (cellSize + cellGap) + marginLeft + 10).attr('height', 7 * (cellSize + cellGap) + marginTop + 10);
+      const colors = ['#eee','#c6e48b','#7bc96f','#239a3b','#196127'];
+      const colorScale = c => c===0?colors[0]:c===1?colors[1]:c===2?colors[2]:c<=4?colors[3]:colors[4];
+      d3.timeMonths(startDate, endDate).forEach(d => svg.append('text').attr('class','month-label').attr('x', d3.timeWeek.count(d3.timeWeek.floor(startDate),d)*(cellSize+cellGap)+marginLeft).attr('y',14).text(d3.timeFormat('%b')(d)));
+      ['','Mon','','Wed','','Fri',''].forEach((l,i) => svg.append('text').attr('class','day-label').attr('x',marginLeft-6).attr('y',i*(cellSize+cellGap)+marginTop+cellSize-1).attr('text-anchor','end').text(l));
+      d3.timeDays(startDate, d3.timeDay.offset(endDate, 1)).forEach(d => {
+        const dateStr = d3.timeFormat('%Y-%m-%d')(d), birds = observationsByDate.get(dateStr) || [], isFuture = d > today;
+        const cell = svg.append('rect').attr('class',`contribution-cell ${isFuture?'future':'past'}`).attr('width',cellSize).attr('height',cellSize)
+          .attr('x', d3.timeWeek.count(d3.timeWeek.floor(startDate),d)*(cellSize+cellGap)+marginLeft).attr('y', d.getDay()*(cellSize+cellGap)+marginTop).attr('fill', isFuture?'#eee':colorScale(birds.length));
+        if (!isFuture) cell.on('mouseenter', e => showTooltip(e,d,birds)).on('mouseleave', hideTooltip);
+      });
+    }
+
+    const tooltip = document.getElementById('tooltip');
+    function showTooltip(event, date, birds) {
+      let html = `<div class="tooltip-count">${birds.length?'🐦 '+birds.length+' species':'No birds spotted'}</div><div class="tooltip-date">${d3.timeFormat('%B %d, %Y')(date)}</div>`;
+      if (birds.length) { html += '<div class="tooltip-birds">'; birds.slice(0,5).forEach(b => html += `<div class="tooltip-bird"><span class="bird-common">${b.common}</span> <span class="bird-sci">${b.sciName}</span></div>`); if (birds.length > 5) html += `<div class="tooltip-bird" style="opacity:0.6">+${birds.length-5} more</div>`; html += '</div>'; }
+      tooltip.innerHTML = html; tooltip.style.left = event.target.getBoundingClientRect().left + 'px'; tooltip.style.top = (event.target.getBoundingClientRect().top - 8) + 'px'; tooltip.style.transform = 'translate(-50%, -100%)'; tooltip.classList.add('visible');
+    }
+    function hideTooltip() { tooltip.classList.remove('visible'); }
+
+    function renderActivity() {
+      const c = document.getElementById('activityList'); c.innerHTML = '';
+      const byMonth = new Map();
+      Array.from(observationsByDate.entries()).sort((a,b) => new Date(b[0]) - new Date(a[0])).slice(0,12).forEach(([d,birds]) => {
+        const k = d3.timeFormat('%B %Y')(new Date(d)); if (!byMonth.has(k)) byMonth.set(k,[]); byMonth.get(k).push({date:d,birds});
+      });
+      byMonth.forEach((entries, month) => {
+        const h = document.createElement('div'); h.className = 'activity-month'; h.textContent = month; c.appendChild(h);
+        entries.forEach(({date,birds}) => { const item = document.createElement('div'); item.className = 'activity-item'; item.innerHTML = `<div class="activity-icon">🐦</div><div class="activity-content"><div class="activity-title">Spotted ${birds.length} species</div><div class="activity-details">${birds.map(b=>b.common).join(', ')}</div></div>`; c.appendChild(item); });
+      });
+    }
+
+    function openShareModal() {
+      const species = new Set(observations.map(o => o.sciName)).size;
+      document.getElementById('shareTwitter').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`I've spotted ${species} bird species! 🐦 Check out my BirdHub profile`)}&url=${encodeURIComponent(window.location.href)}`;
+      document.getElementById('shareModal').classList.add('visible');
+    }
+    function closeModal() { document.getElementById('shareModal').classList.remove('visible'); }
+    
+    function copyLink() {
+      navigator.clipboard.writeText(window.location.href);
+      document.getElementById('copyLinkText').textContent = 'Copied!';
+      setTimeout(() => document.getElementById('copyLinkText').textContent = 'Copy Profile Link', 2000);
+    }
+
+    function exportPNG() {
+      const profileCard = document.getElementById('profileCard');
+      const graphCard = document.getElementById('graphCard');
+      const actions = document.querySelector('.profile-actions');
+      actions.style.display = 'none';
+      
+      const tempContainer = document.createElement('div');
+      tempContainer.style.cssText = 'padding: 20px; background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border-radius: 20px; display: inline-block;';
+      tempContainer.appendChild(profileCard.cloneNode(true));
+      tempContainer.appendChild(graphCard.cloneNode(true));
+      document.body.appendChild(tempContainer);
+      
+      html2canvas(tempContainer, {backgroundColor: null, scale: 2}).then(canvas => {
+        const link = document.createElement('a'); 
+        link.download = `birdhub-${selectedYear}.png`; 
+        link.href = canvas.toDataURL('image/png'); 
+        link.click(); 
+        actions.style.display = 'flex';
+        document.body.removeChild(tempContainer);
+      }).catch(() => {
+        actions.style.display = 'flex';
+        document.body.removeChild(tempContainer);
+      });
+    }
+
+    document.getElementById('shareModal').addEventListener('click', e => { if (e.target.id === 'shareModal') closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    loadProfile();
+  </script>
+</body>
+</html>
