@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BirdHub Contributions</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      background: transparent;
+      padding: 12px;
+    }
+    .widget {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border: 1px solid #e5e5e5;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+    .title a {
+      color: #22c55e;
+      text-decoration: none;
+    }
+    .title a:hover { text-decoration: underline; }
+    .stats {
+      font-size: 12px;
+      color: #666;
+    }
+    .stats strong {
+      color: #22c55e;
+      font-weight: 700;
+    }
+    .graph-wrapper {
+      overflow-x: auto;
+      padding: 4px 0;
+    }
+    .month-label { fill: #666; font-size: 10px; font-weight: 500; }
+    .day-label { fill: #999; font-size: 9px; }
+    .contribution-cell { rx: 2; ry: 2; }
+    .contribution-cell.past:hover { stroke: #333; stroke-width: 1.5; cursor: pointer; }
+    .contribution-cell.future { opacity: 0.3; }
+    .legend {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 8px;
+      font-size: 10px;
+      color: #666;
+    }
+    .legend-cell { width: 10px; height: 10px; border-radius: 2px; }
+    .tooltip {
+      position: fixed;
+      background: #1f2937;
+      color: white;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 1000;
+      max-width: 220px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .tooltip.visible { opacity: 1; }
+    .tooltip-count { font-weight: 700; color: #4ade80; margin-bottom: 2px; }
+    .tooltip-date { opacity: 0.8; font-size: 11px; }
+    .tooltip-birds { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2); }
+    .tooltip-bird { margin-bottom: 4px; }
+    .bird-common { color: #4ade80; font-weight: 600; }
+    .bird-sci { font-style: italic; opacity: 0.7; font-size: 11px; }
+    .powered {
+      margin-top: 8px;
+      text-align: right;
+      font-size: 10px;
+    }
+    .powered a {
+      color: #999;
+      text-decoration: none;
+    }
+    .powered a:hover { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <div class="widget">
+    <div class="header">
+      <div class="title">🐦 <a href="" id="profileLink" target="_blank"><span id="userName">Birder</span></a></div>
+      <div class="stats"><strong id="speciesCount">0</strong> species in <strong id="yearLabel">2025</strong></div>
+    </div>
+    <div class="graph-wrapper">
+      <svg id="graph"></svg>
+    </div>
+    <div class="legend">
+      <span>Less</span>
+      <div class="legend-cell" style="background:#eee"></div>
+      <div class="legend-cell" style="background:#c6e48b"></div>
+      <div class="legend-cell" style="background:#7bc96f"></div>
+      <div class="legend-cell" style="background:#239a3b"></div>
+      <div class="legend-cell" style="background:#196127"></div>
+      <span>More</span>
+    </div>
+    <div class="powered"><a href="https://github.com/jacobjameson/birdhub" target="_blank">Powered by BirdHub</a></div>
+  </div>
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const year = parseInt(params.get('year')) || new Date().getFullYear();
+    const theme = params.get('theme') || 'light';
+    
+    let observations = [];
+    let observationsByDate = new Map();
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    document.getElementById('yearLabel').textContent = year;
+
+    // Set profile link to parent directory
+    const baseUrl = window.location.href.replace(/\/embed\.html.*$/, '/');
+    document.getElementById('profileLink').href = baseUrl;
+
+    async function init() {
+      try {
+        const r = await fetch('data.json');
+        if (!r.ok) throw new Error('No data');
+        const data = await r.json();
+        
+        if (data.profile?.name) {
+          document.getElementById('userName').textContent = data.profile.name;
+        }
+        
+        observations = data.observations || [];
+        
+        // Filter to selected year
+        observations = observations.filter(o => new Date(o.date).getFullYear() === year);
+        
+        // Group by date
+        observations.forEach(o => {
+          if (!observationsByDate.has(o.date)) observationsByDate.set(o.date, []);
+          observationsByDate.get(o.date).push(o);
+        });
+        
+        // Count unique species
+        const uniqueSpecies = new Set(observations.map(o => o.sciName)).size;
+        document.getElementById('speciesCount').textContent = uniqueSpecies;
+        
+        drawGraph();
+      } catch(e) {
+        console.error('Failed to load data:', e);
+      }
+    }
+
+    function drawGraph() {
+      const svg = d3.select('#graph');
+      svg.selectAll('*').remove();
+      
+      const cellSize = 11;
+      const cellGap = 3;
+      const marginTop = 20;
+      const marginLeft = 28;
+      
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year, 11, 31);
+      const weeks = d3.timeWeeks(d3.timeWeek.floor(startDate), d3.timeDay.offset(endDate, 1));
+      
+      svg.attr('width', weeks.length * (cellSize + cellGap) + marginLeft + 10)
+         .attr('height', 7 * (cellSize + cellGap) + marginTop + 10);
+      
+      const colors = ['#eee', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
+      const colorScale = c => c === 0 ? colors[0] : c === 1 ? colors[1] : c === 2 ? colors[2] : c <= 4 ? colors[3] : colors[4];
+      
+      // Month labels
+      d3.timeMonths(startDate, endDate).forEach(d => {
+        svg.append('text')
+          .attr('class', 'month-label')
+          .attr('x', d3.timeWeek.count(d3.timeWeek.floor(startDate), d) * (cellSize + cellGap) + marginLeft)
+          .attr('y', 12)
+          .text(d3.timeFormat('%b')(d));
+      });
+      
+      // Day labels
+      ['', 'M', '', 'W', '', 'F', ''].forEach((l, i) => {
+        svg.append('text')
+          .attr('class', 'day-label')
+          .attr('x', marginLeft - 4)
+          .attr('y', i * (cellSize + cellGap) + marginTop + cellSize - 2)
+          .attr('text-anchor', 'end')
+          .text(l);
+      });
+      
+      // Day cells
+      d3.timeDays(startDate, d3.timeDay.offset(endDate, 1)).forEach(d => {
+        const dateStr = d3.timeFormat('%Y-%m-%d')(d);
+        const birds = observationsByDate.get(dateStr) || [];
+        const isFuture = d > today;
+        
+        const cell = svg.append('rect')
+          .attr('class', `contribution-cell ${isFuture ? 'future' : 'past'}`)
+          .attr('width', cellSize)
+          .attr('height', cellSize)
+          .attr('x', d3.timeWeek.count(d3.timeWeek.floor(startDate), d) * (cellSize + cellGap) + marginLeft)
+          .attr('y', d.getDay() * (cellSize + cellGap) + marginTop)
+          .attr('fill', isFuture ? '#eee' : colorScale(birds.length));
+        
+        if (!isFuture) {
+          cell.on('mouseenter', e => showTooltip(e, d, birds))
+              .on('mouseleave', hideTooltip);
+        }
+      });
+    }
+
+    const tooltip = document.getElementById('tooltip');
+    
+    function showTooltip(event, date, birds) {
+      let html = `<div class="tooltip-count">${birds.length ? '🐦 ' + birds.length + ' species' : 'No birds spotted'}</div>`;
+      html += `<div class="tooltip-date">${d3.timeFormat('%B %d, %Y')(date)}</div>`;
+      
+      if (birds.length) {
+        html += '<div class="tooltip-birds">';
+        birds.slice(0, 4).forEach(b => {
+          html += `<div class="tooltip-bird"><span class="bird-common">${b.common}</span> <span class="bird-sci">${b.sciName}</span></div>`;
+        });
+        if (birds.length > 4) html += `<div class="tooltip-bird" style="opacity:0.6">+${birds.length - 4} more</div>`;
+        html += '</div>';
+      }
+      
+      tooltip.innerHTML = html;
+      tooltip.style.left = event.target.getBoundingClientRect().left + 'px';
+      tooltip.style.top = (event.target.getBoundingClientRect().top - 8) + 'px';
+      tooltip.style.transform = 'translate(-50%, -100%)';
+      tooltip.classList.add('visible');
+    }
+    
+    function hideTooltip() {
+      tooltip.classList.remove('visible');
+    }
+
+    init();
+  </script>
+</body>
+</html>

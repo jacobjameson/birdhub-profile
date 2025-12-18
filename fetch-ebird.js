@@ -1,14 +1,8 @@
 /**
  * Fetch eBird Life List
  * 
- * This script uses Playwright to log into eBird, download your life list CSV,
- * and convert it to data.json for the Big Year visualization.
- * 
- * Required environment variables:
- *   EBIRD_USERNAME - Your eBird username/email
- *   EBIRD_PASSWORD - Your eBird password
- * 
- * Run manually: EBIRD_USERNAME=you@email.com EBIRD_PASSWORD=xxx node scripts/fetch-ebird.js
+ * Uses Playwright to log into eBird, download life list CSV,
+ * and convert it to data.json for BirdHub visualization.
  */
 
 const { chromium } = require('playwright');
@@ -20,13 +14,9 @@ const EBIRD_PASSWORD = process.env.EBIRD_PASSWORD;
 
 if (!EBIRD_USERNAME || !EBIRD_PASSWORD) {
   console.error('❌ Missing EBIRD_USERNAME or EBIRD_PASSWORD environment variables');
-  console.error('   Set these as GitHub Secrets or export them locally');
   process.exit(1);
 }
 
-/**
- * Parse eBird date format "14 Dec 2025" to "2025-12-14"
- */
 function parseEbirdDate(dateStr) {
   const months = {
     'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
@@ -45,19 +35,14 @@ function parseEbirdDate(dateStr) {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * Parse CSV content into observations array
- */
 function parseCSV(csvContent) {
   const lines = csvContent.split('\n');
   const observations = [];
   
-  // Skip header row
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     
-    // Parse CSV with proper quote handling
     const columns = [];
     let current = '';
     let inQuotes = false;
@@ -75,7 +60,7 @@ function parseCSV(csvContent) {
     }
     columns.push(current.trim());
     
-    // Extract fields: Common Name (3), Scientific Name (4), Location (6), S/P (7), Date (8)
+    // eBird CSV: Row #, Species Code, Taxonomic Order, Common Name, Scientific Name, Subspecies, Location, S/P, Date
     if (columns.length >= 9) {
       const date = parseEbirdDate(columns[8]);
       if (date) {
@@ -93,64 +78,85 @@ function parseCSV(csvContent) {
   return observations.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
+// Preserve existing profile info from data.json
+function getExistingProfile() {
+  try {
+    const dataPath = path.join(__dirname, 'data.json');
+    const existing = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    return existing.profile || {};
+  } catch (e) {
+    return {};
+  }
+}
+
 async function fetchEbirdLifeList() {
   console.log('🐦 Starting eBird life list fetch...\n');
   
-  const browser = await chromium.launch({ 
-    headless: true 
-  });
-  
+  const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   });
-  
   const page = await context.newPage();
   
   try {
-    // Step 1: Go to eBird login
-    console.log('📡 Navigating to eBird...');
-    await page.goto('https://secure.birds.cornell.edu/cassso/login?service=https://ebird.org/login/cas?portal=ebird', {
-      waitUntil: 'networkidle'
+    // Go directly to life list - it will redirect to login
+    console.log('📡 Navigating to eBird life list...');
+    await page.goto('https://ebird.org/lifelist?time=life&r=world', {
+      waitUntil: 'networkidle',
+      timeout: 60000
     });
     
-    // Step 2: Fill in credentials
-    console.log('🔐 Logging in...');
-    await page.fill('input[name="username"]', EBIRD_USERNAME);
-    await page.fill('input[name="password"]', EBIRD_PASSWORD);
-    await page.click('button[type="submit"]');
-    
-    // Wait for login to complete
-    await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
-    
-    // Check if login was successful
+    // Check if we need to login
     const currentUrl = page.url();
+    console.log('📍 Current URL:', currentUrl);
+    
     if (currentUrl.includes('login') || currentUrl.includes('cassso')) {
-      throw new Error('Login failed - check your credentials');
+      console.log('🔐 Login required, filling credentials...');
+      
+      // Wait for the login form - use the correct ID selectors
+      await page.waitForSelector('#input-user-name', { timeout: 30000 });
+      
+      // Fill username
+      await page.fill('#input-user-name', EBIRD_USERNAME);
+      console.log('   ✓ Username filled');
+      
+      // Fill password
+      await page.fill('#input-password', EBIRD_PASSWORD);
+      console.log('   ✓ Password filled');
+      
+      // Click submit - it's an input[type="submit"] with id="form-submit"
+      console.log('   Clicking sign in...');
+      await page.click('#form-submit');
+      
+      // Wait for navigation after login
+      console.log('   Waiting for login to complete...');
+      await page.waitForURL(/ebird\.org\/(?!.*login)/, { timeout: 60000 });
+      
+      console.log('✅ Login successful!\n');
     }
     
-    console.log('✅ Login successful!\n');
+    // Now navigate to CSV download
+    console.log('📥 Downloading life list CSV...');
     
-    // Step 3: Navigate to life list CSV download
-    console.log('📥 Downloading life list...');
+    // Set up download handling BEFORE triggering the download
+    const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
     
-    // Set up download handling
-    const downloadPromise = page.waitForEvent('download');
-    
-    // Navigate to CSV export URL
-    await page.goto('https://ebird.org/lifelist?r=world&time=life&fmt=csv', {
-      waitUntil: 'networkidle'
+    // Click the download link on the page (or navigate - but we need to not wait for load)
+    // Use page.evaluate to trigger navigation without waiting
+    page.evaluate(() => {
+      window.location.href = 'https://ebird.org/lifelist?time=life&r=world&fmt=csv';
     });
     
-    // Wait for download
+    // Wait for download to start
     const download = await downloadPromise;
     
     // Save to temp file
-    const tempPath = path.join(__dirname, '..', 'temp_lifelist.csv');
+    const tempPath = path.join(__dirname, 'temp_lifelist.csv');
     await download.saveAs(tempPath);
     
     console.log('✅ Download complete!\n');
     
-    // Step 4: Parse CSV
+    // Parse CSV
     console.log('🔄 Parsing CSV...');
     const csvContent = fs.readFileSync(tempPath, 'utf-8');
     const observations = parseCSV(csvContent);
@@ -160,16 +166,20 @@ async function fetchEbirdLifeList() {
     
     console.log(`✅ Parsed ${observations.length} species\n`);
     
-    // Step 5: Save as data.json
+    // Preserve existing profile info
+    const existingProfile = getExistingProfile();
+    
+    // Save as data.json
     const dataJson = {
       profile: {
+        ...existingProfile,
         lastSync: new Date().toISOString()
       },
       observations: observations,
       exportedAt: new Date().toISOString()
     };
     
-    const outputPath = path.join(__dirname, '..', 'data.json');
+    const outputPath = path.join(__dirname, 'data.json');
     fs.writeFileSync(outputPath, JSON.stringify(dataJson, null, 2));
     
     console.log(`✨ Saved to data.json`);
@@ -182,8 +192,8 @@ async function fetchEbirdLifeList() {
     console.error('❌ Error:', error.message);
     
     // Take screenshot for debugging
-    const screenshotPath = path.join(__dirname, '..', 'error-screenshot.png');
-    await page.screenshot({ path: screenshotPath });
+    const screenshotPath = path.join(__dirname, 'error-screenshot.png');
+    await page.screenshot({ path: screenshotPath, fullPage: true });
     console.error(`   Screenshot saved to ${screenshotPath}`);
     
     process.exit(1);

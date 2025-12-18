@@ -88,12 +88,44 @@ Want to appear in the [BirdHub directory](https://jacobjameson.github.io/birdhub
 
 ```
 ├── index.html          # Your profile page
+├── embed.html          # Embeddable widget
 ├── data.json           # Your bird data (auto-updated)
 ├── fetch-ebird.js      # eBird sync script
 └── .github/workflows/
     ├── sync-ebird.yml      # Daily eBird sync
     └── sync-upstream.yml   # Weekly feature updates
 ```
+
+---
+
+## 📊 Embed Your Graph
+
+Want to show your birding contributions on another website? Use the embed widget!
+
+### Basic embed (current year):
+```html
+<iframe 
+  src="https://YOUR-USERNAME.github.io/REPO-NAME/embed.html" 
+  width="100%" 
+  height="200" 
+  frameborder="0">
+</iframe>
+```
+
+### Specific year:
+```html
+<iframe 
+  src="https://YOUR-USERNAME.github.io/REPO-NAME/embed.html?year=2024" 
+  width="100%" 
+  height="200" 
+  frameborder="0">
+</iframe>
+```
+
+The embed includes:
+- 🗓️ Full year contribution graph
+- 🐦 Hover to see species spotted each day
+- 🔗 Links back to your full profile
 
 ---
 
