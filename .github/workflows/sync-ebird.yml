@@ -2,8 +2,11 @@ name: Sync eBird Life List
 
 on:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 7 * * *'  # Daily at 7am UTC
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   sync:
