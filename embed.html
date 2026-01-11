@@ -99,7 +99,7 @@
   <div class="widget">
     <div class="header">
       <div class="title">🐦 <a href="" id="profileLink" target="_blank"><span id="userName">Birder</span></a></div>
-      <div class="stats"><strong id="speciesCount">0</strong> species in <strong id="yearLabel">2025</strong></div>
+      <div class="stats"><strong id="speciesCount">0</strong> species in <strong id="yearLabel"></strong></div>
     </div>
     <div class="graph-wrapper">
       <svg id="graph"></svg>
@@ -142,20 +142,34 @@
           document.getElementById('userName').textContent = data.profile.name;
         }
         
-        observations = data.observations || [];
-        
-        // Filter to selected year
-        observations = observations.filter(o => new Date(o.date).getFullYear() === year);
-        
+        const allObservations = data.observations || [];
+
+        // Count only NEW species for the selected year (species not seen in any prior year)
+        const sortedObs = [...allObservations].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const seenSpecies = new Set();
+        let newSpeciesCount = 0;
+
+        sortedObs.forEach(o => {
+          const obsYear = new Date(o.date).getFullYear();
+          if (!seenSpecies.has(o.sciName)) {
+            if (obsYear === year) {
+              newSpeciesCount++;
+            }
+            seenSpecies.add(o.sciName);
+          }
+        });
+
+        // Filter to selected year for display
+        observations = allObservations.filter(o => new Date(o.date).getFullYear() === year);
+
         // Group by date
         observations.forEach(o => {
           if (!observationsByDate.has(o.date)) observationsByDate.set(o.date, []);
           observationsByDate.get(o.date).push(o);
         });
-        
-        // Count unique species
-        const uniqueSpecies = new Set(observations.map(o => o.sciName)).size;
-        document.getElementById('speciesCount').textContent = uniqueSpecies;
+
+        // Display new species count for the year
+        document.getElementById('speciesCount').textContent = newSpeciesCount;
         
         drawGraph();
       } catch(e) {

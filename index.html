@@ -169,7 +169,7 @@
         <div class="profile-info">
           <div class="profile-name-row">
             <h1 class="profile-name" id="profileName">Birder</h1>
-            <span class="profile-badge" id="profileBadge">2025</span>
+            <span class="profile-badge" id="profileBadge"></span>
           </div>
           <p class="profile-bio" id="profileBio">Tracking my birding adventures</p>
           <div class="profile-links" id="profileLinks"></div>
@@ -188,7 +188,7 @@
 
     <div class="graph-card" id="graphCard">
       <div class="graph-header">
-        <div class="graph-title"><strong id="yearSpeciesCount">0</strong> species in <span id="selectedYearText">2025</span></div>
+        <div class="graph-title"><strong id="yearSpeciesCount">0</strong> species in <span id="selectedYearText"></span></div>
         <div class="year-selector" id="yearSelector"></div>
       </div>
       <div class="graph-wrapper"><svg class="contribution-graph" id="graph"></svg></div>
@@ -290,8 +290,22 @@
     }
 
     function updateYearStats() {
-      const yearObs = observations.filter(o => new Date(o.date).getFullYear() === selectedYear);
-      document.getElementById('yearSpeciesCount').textContent = new Set(yearObs.map(o => o.sciName)).size;
+      // Count only NEW species for the selected year (species not seen in any prior year)
+      const sortedObs = [...observations].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const seenSpecies = new Set();
+      const newSpeciesPerYear = new Map();
+
+      sortedObs.forEach(o => {
+        const year = new Date(o.date).getFullYear();
+        if (!seenSpecies.has(o.sciName)) {
+          if (!newSpeciesPerYear.has(year)) newSpeciesPerYear.set(year, new Set());
+          newSpeciesPerYear.get(year).add(o.sciName);
+          seenSpecies.add(o.sciName);
+        }
+      });
+
+      const newSpeciesCount = newSpeciesPerYear.get(selectedYear)?.size || 0;
+      document.getElementById('yearSpeciesCount').textContent = newSpeciesCount;
       document.getElementById('selectedYearText').textContent = selectedYear;
     }
 
